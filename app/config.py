@@ -125,10 +125,13 @@ class Settings(BaseSettings):
     
     @validator("CORS_ORIGINS", pre=True)
     def parse_cors_origins(cls, v):
-        if not v:  # Handle empty or None input
-            return []
+        # Handle missing, empty, or invalid CORS_ORIGINS
+        if v is None or v == "" or (isinstance(v, str) and not v.strip()):
+            return ["https://eduquiz-pro.up.railway.app"]  # Default for Railway
         if isinstance(v, str):
             return [origin.strip() for origin in v.split(",") if origin.strip()]
+        if isinstance(v, list):
+            return [origin for origin in v if isinstance(origin, str) and origin.strip()]
         return v
     
     @property
@@ -181,7 +184,7 @@ class ProductionSettings(Settings):
     HOST: str = "0.0.0.0"
     PORT: int = int(os.getenv("PORT", 8000))  # Use Railway's dynamic PORT
     DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://postgres@localhost:5432/quizapp")  # Fallback for safety
-    CORS_ORIGINS: List[str] = ["https://eduquiz-pro.up.railway.app"]  # Default to Railway domain
+    CORS_ORIGINS: List[str] = ["https://eduquiz-pro.up.railway.app"]  # Default for Railway
     ALLOWED_HOSTS: List[str] = ["eduquiz-pro.up.railway.app", "localhost", "127.0.0.1"]  # Restrict for security
     
     class Config:
