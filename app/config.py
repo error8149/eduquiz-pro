@@ -125,14 +125,25 @@ class Settings(BaseSettings):
     
     @validator("CORS_ORIGINS", pre=True)
     def parse_cors_origins(cls, v):
+        logging.info(f"Raw CORS_ORIGINS value: {v}")  # Debug log
         # Handle missing, empty, or invalid CORS_ORIGINS
-        if v is None or v == "" or (isinstance(v, str) and not v.strip()):
-            return ["https://eduquiz-pro.up.railway.app"]  # Default for Railway
+        if v is None or str(v).strip() == "":
+            logging.warning("CORS_ORIGINS is empty or None, using default")
+            return ["https://eduquiz-pro.up.railway.app"]
         if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
+            cleaned = [origin.strip() for origin in v.split(",") if origin.strip()]
+            if not cleaned:
+                logging.warning("CORS_ORIGINS string is invalid, using default")
+                return ["https://eduquiz-pro.up.railway.app"]
+            return cleaned
         if isinstance(v, list):
-            return [origin for origin in v if isinstance(origin, str) and origin.strip()]
-        return v
+            cleaned = [origin for origin in v if isinstance(origin, str) and origin.strip()]
+            if not cleaned:
+                logging.warning("CORS_ORIGINS list is invalid, using default")
+                return ["https://eduquiz-pro.up.railway.app"]
+            return cleaned
+        logging.error(f"Unexpected CORS_ORIGINS type: {type(v)}, using default")
+        return ["https://eduquiz-pro.up.railway.app"]
     
     @property
     def is_development(self) -> bool:
@@ -183,9 +194,9 @@ class ProductionSettings(Settings):
     LOG_LEVEL: str = "INFO"
     HOST: str = "0.0.0.0"
     PORT: int = int(os.getenv("PORT", 8000))  # Use Railway's dynamic PORT
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://postgres@localhost:5432/quizapp")  # Fallback for safety
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://postgres@localhost:5432/quizapp")  # Fallback
     CORS_ORIGINS: List[str] = ["https://eduquiz-pro.up.railway.app"]  # Default for Railway
-    ALLOWED_HOSTS: List[str] = ["eduquiz-pro.up.railway.app", "localhost", "127.0.0.1"]  # Restrict for security
+    ALLOWED_HOSTS: List[str] = ["eduquiz-pro.up.railway.app", "localhost", "127.0.0.1"]
     
     class Config:
         env_file = ".env.production"
