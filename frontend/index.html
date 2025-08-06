@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduQuiz Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" integrity="sha512-z3gLpd7yknf1YoNbCzqRKc4qyor8gaKU1qmn+CShxbuBusANI9QpRohGBreCFkKxLhei6S9CQXFEbbKuqLg0DA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        .slide-in { animation: slideIn 0.3s ease-out; }
+        .toast-progress-bar { animation: progress 4s linear forwards; }
+        .loading-progress-bar { animation: progress 10s linear infinite; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes progress { from { width: 100%; } to { width: 0; } }
+        .option-card.correct { border-color: #10b981; background-color: #065f46; }
+        .option-card.incorrect { border-color: #ef4444; background-color: #7f1d1d; }
+        .option-card.disabled { cursor: not-allowed; opacity: 0.6; }
+        .glass-effect { backdrop-filter: blur(10px); background: rgba(31, 41, 55, 0.8); }
+        .nav-link.active { background-color: #065f46; color: #10b981; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-gray-100 min-h-screen flex flex-col">
+    <nav class="glass-effect shadow-xl border-b border-gray-700">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <h1 class="text-2xl font-bold text-green-400 flex items-center">
+                        <i class="fas fa-graduation-cap mr-2"></i>
+                        EduQuiz Pro
+                    </h1>
+                </div>
+                <div class="flex space-x-2 items-center">
+                    <a href="#" class="nav-btn nav-link text-gray-300 hover:text-green-400 px-4 py-2 rounded-lg text-sm font-medium transition-all" data-view="setup">
+                        <i class="fas fa-play mr-1"></i>Setup
+                    </a>
+                    <a href="#" class="nav-btn nav-link text-gray-300 hover:text-green-400 px-4 py-2 rounded-lg text-sm font-medium transition-all" data-view="history">
+                        <i class="fas fa-history mr-1"></i>History
+                    </a>
+                    <a href="#" class="nav-btn nav-link text-gray-300 hover:text-green-400 px-4 py-2 rounded-lg text-sm font-medium transition-all" data-view="settings">
+                        <i class="fas fa-cog mr-1"></i>Settings
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="flex-grow py-8">
+        <div id="setup-view" class="container mx-auto px-4"></div>
+        <div id="quiz-view" class="container mx-auto px-4 hidden"></div>
+        <div id="results-view" class="container mx-auto px-4 hidden"></div>
+        <div id="history-view" class="container mx-auto px-4 hidden"></div>
+        <div id="settings-view" class="container mx-auto px-4 hidden"></div>
+    </main>
+
+    <div id="toast" class="fixed bottom-4 right-4 glass-effect text-white p-4 rounded-xl shadow-2xl flex items-center hidden transform transition-all duration-300">
+        <i id="toast-icon" class="mr-3 text-xl"></i>
+        <span id="toast-message"></span>
+        <div id="toast-progress" class="absolute bottom-0 left-0 h-1 bg-green-500 rounded-b-xl"></div>
+    </div>
+
+    <div id="loading-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center hidden backdrop-blur-sm">
+        <div class="glass-effect p-8 rounded-2xl shadow-2xl text-center max-w-md mx-4">
+            <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-green-400 mx-auto mb-4"></div>
+            <p id="loading-message" class="text-xl font-semibold">Loading...</p>
+            <div id="loading-progress" class="h-2 bg-gray-700 rounded-full mt-4 overflow-hidden">
+                <div class="h-full bg-gradient-to-r from-green-400 to-blue-500 loading-progress-bar"></div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="glass-effect py-6 border-t border-gray-700">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-400">
+            <p>&copy; 2025 EduQuiz Pro. All rights reserved. | AI-powered exam preparation platform</p>
+        </div>
+    </footer>
+
+    <script src="/js/app.js"></script>
+</body>
+</html>
