@@ -12,18 +12,11 @@ pydantic-settings==2.1.0
 
 # Database
 sqlalchemy==2.0.23
+psycopg2-binary==2.9.9
 
 # Utilities
 tenacity==8.2.3
 python-multipart==0.0.6
 
-# Production deployment
+# Production server
 gunicorn==21.2.0
-
-# Database drivers (PostgreSQL for production)
-psycopg2-binary==2.9.9
-
-# Development and testing (optional)
-pytest==7.4.3
-pytest-asyncio==0.21.1
-httpx==0.25.2

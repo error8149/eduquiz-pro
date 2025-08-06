@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: eduquiz-pro
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: false
+      - key: ALLOWED_ORIGINS
+        value: https://eduquiz-pro.onrender.com
+      - key: BASE_URL
+        value: https://eduquiz-pro.onrender.com
+      - key: LOG_LEVEL
+        value: INFO
