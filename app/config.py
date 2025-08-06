@@ -1,8 +1,9 @@
-import os
 import logging
+import os
 from typing import List, Optional
-from pydantic_settings import BaseSettings
+
 from pydantic import validator
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -124,8 +125,10 @@ class Settings(BaseSettings):
     
     @validator("CORS_ORIGINS", pre=True)
     def parse_cors_origins(cls, v):
+        if not v:  # Handle empty or None input
+            return []
         if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",")]
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
         return v
     
     @property
@@ -161,7 +164,6 @@ class Settings(BaseSettings):
         env_file_encoding = "utf-8"
         case_sensitive = True
 
-
 class DevelopmentSettings(Settings):
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
@@ -171,29 +173,28 @@ class DevelopmentSettings(Settings):
     class Config:
         env_file = ".env.development"
 
-
 class ProductionSettings(Settings):
     ENVIRONMENT: str = "production"
     DEBUG: bool = False
     RELOAD: bool = False
     LOG_LEVEL: str = "INFO"
     HOST: str = "0.0.0.0"
-    CORS_ORIGINS: List[str] = []
-    ALLOWED_HOSTS: List[str] = []
+    PORT: int = int(os.getenv("PORT", 8000))  # Use Railway's dynamic PORT
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://postgres@localhost:5432/quizapp")  # Fallback for safety
+    CORS_ORIGINS: List[str] = ["https://eduquiz-pro.up.railway.app"]  # Default to Railway domain
+    ALLOWED_HOSTS: List[str] = ["eduquiz-pro.up.railway.app", "localhost", "127.0.0.1"]  # Restrict for security
     
     class Config:
         env_file = ".env.production"
 
-
 class StagingSettings(Settings):
-    ENVIRONMENT: str = "staging" 
+    ENVIRONMENT: str = "staging"
     DEBUG: bool = False
     RELOAD: bool = False
     LOG_LEVEL: str = "INFO"
     
     class Config:
         env_file = ".env.staging"
-
 
 def get_settings() -> Settings:
     env = os.getenv("ENVIRONMENT", "development").lower()
@@ -205,10 +206,8 @@ def get_settings() -> Settings:
     else:
         return DevelopmentSettings()
 
-
 # Export the settings instance
 settings = get_settings()
-
 
 class DatabaseConfig:
     URL = settings.DATABASE_URL
@@ -217,7 +216,6 @@ class DatabaseConfig:
     POOL_TIMEOUT = settings.DATABASE_POOL_TIMEOUT
     POOL_RECYCLE = settings.DATABASE_POOL_RECYCLE
     ECHO = settings.DEBUG
-
 
 class LoggingConfig:
     LEVEL = settings.log_level_int
@@ -228,14 +226,12 @@ class LoggingConfig:
     ENABLE_FILE = settings.ENABLE_FILE_LOGGING
     ENABLE_CONSOLE = settings.ENABLE_CONSOLE_LOGGING
 
-
 class APIConfig:
     TIMEOUT = settings.API_TIMEOUT
     MAX_QUESTIONS = settings.MAX_QUESTIONS_PER_QUIZ
     MIN_QUESTIONS = settings.MIN_QUESTIONS_PER_QUIZ
     SUPPORTED_PROVIDERS = settings.SUPPORTED_AI_PROVIDERS
     MAX_RETRIES = settings.AI_MAX_RETRIES
-
 
 # Export individual configs for easy importing
 db_config = DatabaseConfig()
