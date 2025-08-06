@@ -1,22 +1,65 @@
-# Core FastAPI and server
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-
-# HTTP client for AI APIs
+# HTTP client for async API requests to AI providers
 aiohttp==3.9.1
 
-# Environment and configuration
+# FastAPI framework for building the backend API
+fastapi==0.104.1
+
+# ASGI server for running FastAPI in production
+uvicorn[standard]==0.24.0
+
+# Load environment variables from .env file
 python-dotenv==1.0.0
-pydantic==2.5.0
-pydantic-settings==2.1.0
 
-# Database
-sqlalchemy==2.0.23
-psycopg2-binary==2.9.9
-
-# Utilities
-tenacity==8.2.3
+# Parse multipart form data in FastAPI
 python-multipart==0.0.6
 
-# Production server
+# ORM for database operations with PostgreSQL, MySQL, SQLite support
+sqlalchemy==2.0.23
+
+# Retry logic for handling transient API failures and network issues
+tenacity==8.2.3
+
+# Rate limiting for FastAPI endpoints to prevent abuse
+slowapi==0.1.9
+
+# Redis client for caching and rate limiting (optional)
+redis==5.0.1
+
+# Data validation and serialization for FastAPI schemas
+pydantic==2.5.0
+
+# Settings management for Pydantic V2
+pydantic-settings==2.1.0
+
+# Optional async database support for better performance
+databases[postgresql,mysql,sqlite]==0.8.0
+
+# HTTP requests library for web search verification
+requests==2.31.0
+
+# JSON Web Token support for authentication (future use)
+pyjwt==2.8.0
+
+# Password hashing and verification
+passlib[bcrypt]==1.7.4
+
+# Cryptographic functions
+cryptography==41.0.8
+
+# Email validation
+email-validator==2.1.0
+
+# Development and testing dependencies
+pytest==7.4.3
+pytest-asyncio==0.21.1
+httpx==0.25.2
+
+# Production deployment
 gunicorn==21.2.0
+
+# Environment-specific dependencies
+psycopg2-binary==2.9.9  # PostgreSQL adapter
+pymysql==1.1.0  # MySQL adapter
+
+# Monitoring and logging
+python-json-logger==2.0.7

@@ -8,6 +8,7 @@ from tenacity import (before_sleep_log, retry, retry_if_exception_type,
                       retry_if_result, stop_after_attempt, wait_exponential)
 
 from . import schemas
+from .config import api_config, settings
 
 # Setup detailed logging
 logger = logging.getLogger(__name__)
@@ -86,7 +87,7 @@ def is_error_result(result):
     return isinstance(result, dict) and "error" in result
 
 @retry(
-    stop=stop_after_attempt(3),
+    stop=stop_after_attempt(api_config.MAX_RETRIES),
     wait=wait_exponential(multiplier=1, min=2, max=15),
     retry=(retry_if_exception_type((aiohttp.ClientResponseError, aiohttp.ServerDisconnectedError, asyncio.TimeoutError)) | retry_if_result(is_error_result)),
     before_sleep=before_sleep_log(logger, logging.WARNING)
@@ -102,6 +103,10 @@ async def _generate_single_question(session: aiohttp.ClientSession, topic: str, 
     if not topic or not section:
         logger.error(f"Invalid topic or section: topic='{topic}', section='{section}'")
         return {"error": "Topic and section must not be empty"}
+    
+    if api_provider not in api_config.SUPPORTED_PROVIDERS:
+        logger.error(f"Unsupported API provider: {api_provider}")
+        return {"error": f"Unsupported API provider: {api_provider}. Supported: {api_config.SUPPORTED_PROVIDERS}"}
     
     url = API_URLS.get(api_provider)
     if not url:
@@ -127,11 +132,13 @@ async def _generate_single_question(session: aiohttp.ClientSession, topic: str, 
         }
 
     try:
-        async with session.post(url, headers=headers, json=payload, timeout=30) as response:
+        async with session.post(url, headers=headers, json=payload, timeout=api_config.TIMEOUT) as response:
             status = response.status
             headers_str = str(response.headers)
             response_text = await response.text()
-            logger.debug(f"API response from {api_provider}: status={status}, headers={headers_str}, body={response_text[:200]}...")
+            
+            if settings.DEBUG:
+                logger.debug(f"API response from {api_provider}: status={status}, headers={headers_str}, body={response_text[:200]}...")
 
             if status == 429:
                 logger.warning(f"Rate limit exceeded for {api_provider}")
@@ -169,7 +176,9 @@ async def _generate_single_question(session: aiohttp.ClientSession, topic: str, 
                     if question_data["correct_answer"] not in question_data["options"]:
                         logger.error(f"Correct answer not in options: {question_data['correct_answer']} not in {question_data['options']}")
                         return {"error": "Invalid question format: correct answer must be one of the options"}
-                    logger.debug(f"Generated valid question: {question_data['question_text'][:50]}...")
+                    
+                    if settings.DEBUG:
+                        logger.debug(f"Generated valid question: {question_data['question_text'][:50]}...")
                     return question_data
                 except json.JSONDecodeError as e:
                     logger.error(f"Failed to parse content as JSON from {api_provider}. Content: '{content_str[:200]}'")
@@ -196,6 +205,10 @@ async def get_questions(request: schemas.StartQuizRequest) -> List[dict]:
     if not request.topics:
         logger.error("No topics provided for question generation.")
         return [{"error": "No topics provided"}]
+    
+    if request.num_questions > api_config.MAX_QUESTIONS:
+        logger.error(f"Too many questions requested: {request.num_questions} > {api_config.MAX_QUESTIONS}")
+        return [{"error": f"Maximum {api_config.MAX_QUESTIONS} questions allowed"}]
     
     # Extract grade_level and difficulty with defaults
     grade_level = getattr(request, 'grade_level', 'high school')
@@ -236,7 +249,8 @@ async def get_questions(request: schemas.StartQuizRequest) -> List[dict]:
                 if isinstance(res, dict):
                     question_signature = res.get("question_text", "").strip().lower()
                     if question_signature and question_signature not in used_questions:
-                        logger.debug(f"Successfully generated and added question: {question_signature[:50]}...")
+                        if settings.DEBUG:
+                            logger.debug(f"Successfully generated and added question: {question_signature[:50]}...")
                         generated_questions.append(res)
                         used_questions.add(question_signature)
                     else:
@@ -277,10 +291,12 @@ async def get_ai_explanation(question_context: dict, user_query: str, api_key: s
             "generationConfig": {"response_mime_type": "text/plain"}
         }
         try:
-            async with session.post(url, json=payload, timeout=30) as response:
+            async with session.post(url, json=payload, timeout=api_config.TIMEOUT) as response:
                 status = response.status
                 response_text = await response.text()
-                logger.debug(f"AI explanation response: status={status}, body={response_text[:200]}...")
+                
+                if settings.DEBUG:
+                    logger.debug(f"AI explanation response: status={status}, body={response_text[:200]}...")
                 
                 if status == 429:
                     logger.warning("Rate limit exceeded for Gemini API.")
@@ -297,7 +313,8 @@ async def get_ai_explanation(question_context: dict, user_query: str, api_key: s
                 try:
                     result = json.loads(response_text)
                     content = result.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "Sorry, I couldn't get an explanation for that.")
-                    logger.debug(f"AI explanation extracted: {content[:50]}...")
+                    if settings.DEBUG:
+                        logger.debug(f"AI explanation extracted: {content[:50]}...")
                     return content
                 except json.JSONDecodeError as e:
                     logger.error(f"Failed to decode JSON from AI explanation response. Raw text: '{response_text[:200]}'")

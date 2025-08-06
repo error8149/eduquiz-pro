@@ -1,6 +1,5 @@
 import logging
 import os
-from contextlib import asynccontextmanager
 from logging.handlers import RotatingFileHandler
 
 from fastapi import FastAPI, Request
@@ -8,180 +7,152 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from .config import settings
 from .routers import error_router, history, quiz_router
+from .config import settings, log_config
+from .database import check_database_health
 
-# Setup logging based on configuration
-def setup_logging():
-    """Configure logging based on settings"""
-    log_handlers = [logging.StreamHandler()]
-    
-    # Add file handler only in development or if explicitly configured
-    if settings.is_development and settings.log_file:
-        try:
-            file_handler = RotatingFileHandler(
-                settings.log_file,
-                maxBytes=settings.log_max_size,
-                backupCount=settings.log_backup_count
-            )
-            log_handlers.append(file_handler)
-        except Exception as e:
-            print(f"Warning: Could not setup file logging: {e}")
-    
-    logging.basicConfig(
-        level=getattr(logging, settings.log_level.upper()),
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=log_handlers,
-        force=True
-    )
-
-setup_logging()
+# Setup logging
 logger = logging.getLogger(__name__)
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Application lifespan management"""
-    # Startup
-    logger.info(f"🚀 Starting {settings.app_name} v{settings.app_version}")
-    logger.info(f"🌍 Environment: {settings.environment}")
-    logger.info(f"🗄️  Database: {settings.database_url[:30]}...")
-    logger.info(f"🔗 Base URL: {settings.base_url}")
-    logger.info(f"🎯 API Endpoint: {settings.base_url}{settings.api_base_url}")
+def setup_logging():
+    """Configure application logging"""
+    handlers = []
     
-    yield
+    # Console handler
+    if log_config.ENABLE_CONSOLE:
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(log_config.LEVEL)
+        console_handler.setFormatter(logging.Formatter(log_config.FORMAT))
+        handlers.append(console_handler)
     
-    # Shutdown
-    logger.info(f"⚡ Shutting down {settings.app_name}")
+    # File handler
+    if log_config.ENABLE_FILE:
+        file_handler = RotatingFileHandler(
+            log_config.FILE, 
+            maxBytes=log_config.MAX_BYTES, 
+            backupCount=log_config.BACKUP_COUNT
+        )
+        file_handler.setLevel(log_config.LEVEL)
+        file_handler.setFormatter(logging.Formatter(log_config.FORMAT))
+        handlers.append(file_handler)
+    
+    # Configure root logger
+    logging.basicConfig(
+        level=log_config.LEVEL,
+        format=log_config.FORMAT,
+        handlers=handlers
+    )
+
+# Initialize logging
+setup_logging()
 
 # Create FastAPI app
 app = FastAPI(
-    title=settings.app_name,
-    description="AI-Powered Quiz Platform for Exam Preparation",
-    version=settings.app_version,
-    lifespan=lifespan,
-    docs_url="/docs" if settings.debug else None,
-    redoc_url="/redoc" if settings.debug else None,
+    title=settings.APP_NAME,
+    description=settings.APP_DESCRIPTION,
+    version=settings.APP_VERSION,
+    debug=settings.DEBUG
 )
 
 # CORS middleware
-logger.info("🔒 Configuring CORS middleware")
+logger.info("Initializing CORS middleware")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.allowed_origins,
-    allow_credentials=settings.cors_allow_credentials,
-    allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["*"],
-    max_age=settings.cors_max_age,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
+    allow_methods=settings.CORS_ALLOW_METHODS,
+    allow_headers=settings.CORS_ALLOW_HEADERS,
 )
 
-# Request logging middleware
+# Log all requests
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
-    """Log requests and handle errors"""
-    if settings.debug:
-        client_ip = request.client.host if request.client else "unknown"
-        logger.info(f"📥 {request.method} {request.url.path} from {client_ip}")
-    
+    logger.info(f"Received {request.method} request for {request.url.path} from {request.client.host}")
+    if settings.DEBUG:
+        logger.debug(f"Headers: {dict(request.headers)}")
     try:
         response = await call_next(request)
-        
-        if settings.debug:
-            logger.info(f"📤 Response: {response.status_code}")
-        
+        logger.info(f"Responded with status {response.status_code} for {request.url.path}")
         return response
-        
     except Exception as e:
-        logger.error(f"❌ Error processing {request.method} {request.url.path}: {str(e)}")
-        return JSONResponse(
-            status_code=500,
-            content={"detail": "Internal server error"}
-        )
+        logger.error(f"Error processing {request.method} {request.url.path}: {str(e)}", exc_info=True)
+        return JSONResponse(status_code=500, content={"detail": f"Internal server error: {str(e)}"})
 
-# Enhanced OPTIONS handler
-@app.options("/{path:path}")
+# Explicit OPTIONS handler for all API routes
+@app.options(f"{settings.API_V1_PREFIX}/{{path:path}}")
 async def options_handler(request: Request):
-    """Handle CORS preflight requests"""
-    origin = request.headers.get("origin", "*")
-    
+    logger.info(f"Handling OPTIONS request for {request.url.path} from {request.client.host}")
     return JSONResponse(
         content={"status": "ok"},
         headers={
-            "Access-Control-Allow-Origin": origin if origin in settings.allowed_origins else "*",
-            "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-            "Access-Control-Allow-Headers": "*",
-            "Access-Control-Max-Age": str(settings.cors_max_age),
-            "Access-Control-Allow-Credentials": "true" if settings.cors_allow_credentials else "false",
+            "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
+            "Access-Control-Allow-Methods": ",".join(settings.CORS_ALLOW_METHODS),
+            "Access-Control-Allow-Headers": ",".join(settings.CORS_ALLOW_HEADERS),
+            "Access-Control-Max-Age": "86400",
         }
     )
 
-# Include API routers
-logger.info("📚 Including API routers")
-app.include_router(quiz_router, prefix=settings.api_base_url, tags=["Quiz"])
-app.include_router(error_router, prefix=settings.api_base_url, tags=["Error"])
-app.include_router(history, prefix=settings.api_base_url, tags=["History"])
+# Include routers
+logger.info("Including routers")
+try:
+    app.include_router(quiz_router, prefix=settings.API_V1_PREFIX, tags=["Quiz"])
+    app.include_router(error_router, prefix=settings.API_V1_PREFIX, tags=["Error"])
+    app.include_router(history, prefix=settings.API_V1_PREFIX, tags=["History"])
+except Exception as e:
+    logger.error(f"Failed to include routers: {str(e)}", exc_info=True)
+    raise
 
-# Static files setup
-frontend_path = os.path.join(os.path.dirname(__file__), "..", settings.frontend_path)
-if os.path.exists(frontend_path):
-    app.mount(settings.static_url, StaticFiles(directory=frontend_path), name="static")
-    logger.info(f"📁 Static files mounted from: {frontend_path}")
-else:
-    logger.warning(f"⚠️  Frontend directory not found: {frontend_path}")
+# Mount static files
+frontend_path = os.path.join(os.path.dirname(__file__), "..", settings.FRONTEND_DIR)
+if not os.path.exists(frontend_path):
+    logger.error(f"Frontend directory not found at {frontend_path}")
+    raise RuntimeError(f"Frontend directory not found at {frontend_path}")
+
+app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
 
 @app.get("/")
 async def root():
-    """Serve the main application page"""
-    index_path = os.path.join(frontend_path, "index.html")
-    if os.path.exists(index_path):
-        return FileResponse(index_path)
-    
-    return {
-        "message": f"Welcome to {settings.app_name} API",
-        "version": settings.app_version,
-        "environment": settings.environment,
-        "docs": "/docs" if settings.debug else "Documentation disabled in production",
-        "api": f"{settings.api_base_url}",
-        "health": "/health"
-    }
+    logger.info("Serving root endpoint: index.html")
+    return FileResponse(os.path.join(frontend_path, "index.html"))
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint for monitoring"""
+    logger.info("Health check requested")
+    db_healthy = check_database_health()
     return {
-        "status": "healthy",
-        "app": settings.app_name,
-        "version": settings.app_version,
-        "environment": settings.environment,
-        "timestamp": __import__('datetime').datetime.utcnow().isoformat()
+        "status": "healthy" if db_healthy else "unhealthy", 
+        "database": "connected" if db_healthy else "disconnected",
+        "environment": settings.ENVIRONMENT,
+        "version": settings.APP_VERSION,
+        "debug": settings.DEBUG
     }
 
 @app.get("/config")
-async def get_client_config():
-    """Get client-side configuration"""
+async def get_config():
+    """Get public configuration for frontend"""
     return {
-        "api_base_url": settings.api_base_url,
-        "app_name": settings.app_name,
-        "version": settings.app_version,
-        "environment": settings.environment,
-        "base_url": settings.base_url,
-        "defaults": {
-            "ai_provider": settings.default_ai_provider,
-            "grade_level": settings.default_grade_level,
-            "difficulty": settings.default_difficulty,
-            "num_questions": settings.default_num_questions,
-            "time_limit": settings.default_time_limit
+        "app_name": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+        "environment": settings.ENVIRONMENT,
+        "api_base_url": settings.API_V1_PREFIX,
+        "max_questions": settings.MAX_QUESTIONS_PER_QUIZ,
+        "min_questions": settings.MIN_QUESTIONS_PER_QUIZ,
+        "supported_providers": settings.SUPPORTED_AI_PROVIDERS,
+        "features": {
+            "history": settings.ENABLE_HISTORY,
+            "export": settings.ENABLE_EXPORT,
+            "ai_explanations": settings.ENABLE_AI_EXPLANATIONS,
+            "manual_mode": settings.ENABLE_MANUAL_MODE,
         }
     }
 
-if __name__ == "__main__":
-    import uvicorn
-    
-    logger.info(f"🚀 Starting server on {settings.host}:{settings.port}")
-    uvicorn.run(
-        "app.main:app",
-        host=settings.host,
-        port=settings.port,
-        reload=settings.debug,
-        log_level=settings.log_level.lower(),
-        access_log=settings.debug
-    )
+@app.on_event("startup")
+async def startup_event():
+    logger.info(f"{settings.APP_NAME} v{settings.APP_VERSION} started in {settings.ENVIRONMENT} mode")
+    logger.info(f"Debug mode: {settings.DEBUG}")
+    logger.info(f"Database: {settings.DATABASE_URL}")
+    logger.info(f"Host: {settings.HOST}:{settings.PORT}")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    logger.info(f"{settings.APP_NAME} shutting down")

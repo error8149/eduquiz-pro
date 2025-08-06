@@ -3,6 +3,8 @@ from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field, ValidationError, validator
 
+from .config import api_config
+
 
 class QuestionBase(BaseModel):
     """
@@ -72,9 +74,9 @@ class QuizBase(BaseModel):
 
     @validator("total_questions")
     def total_questions_valid(cls, v):
-        """Ensure total_questions is between 1 and 50."""
-        if v < 1 or v > 50:
-            raise ValueError("Total questions must be between 1 and 50")
+        """Ensure total_questions is between configured limits."""
+        if v < api_config.MIN_QUESTIONS or v > api_config.MAX_QUESTIONS:
+            raise ValueError(f"Total questions must be between {api_config.MIN_QUESTIONS} and {api_config.MAX_QUESTIONS}")
         return v
 
     @validator("time_taken")
@@ -122,17 +124,16 @@ class StartQuizRequest(BaseModel):
 
     @validator("num_questions")
     def num_questions_valid(cls, v):
-        """Ensure num_questions is between 1 and 50."""
-        if v < 1 or v > 50:
-            raise ValueError("Number of questions must be between 1 and 50")
+        """Ensure num_questions is between configured limits."""
+        if v < api_config.MIN_QUESTIONS or v > api_config.MAX_QUESTIONS:
+            raise ValueError(f"Number of questions must be between {api_config.MIN_QUESTIONS} and {api_config.MAX_QUESTIONS}")
         return v
 
     @validator("api_provider")
     def api_provider_valid(cls, v):
         """Ensure api_provider is one of the supported providers."""
-        valid_providers = ["gemini", "openai", "groq"]
-        if v not in valid_providers:
-            raise ValueError(f"API provider must be one of: {', '.join(valid_providers)}")
+        if v not in api_config.SUPPORTED_PROVIDERS:
+            raise ValueError(f"API provider must be one of: {', '.join(api_config.SUPPORTED_PROVIDERS)}")
         return v
 
     @validator("topics")
@@ -171,9 +172,9 @@ class GeneratePromptRequest(BaseModel):
 
     @validator("num_questions")
     def num_questions_valid(cls, v):
-        """Ensure num_questions is between 1 and 50."""
-        if v < 1 or v > 50:
-            raise ValueError("Number of questions must be between 1 and 50")
+        """Ensure num_questions is between configured limits."""
+        if v < api_config.MIN_QUESTIONS or v > api_config.MAX_QUESTIONS:
+            raise ValueError(f"Number of questions must be between {api_config.MIN_QUESTIONS} and {api_config.MAX_QUESTIONS}")
         return v
 
     @validator("topics")

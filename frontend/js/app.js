@@ -1,66 +1,14 @@
 // app.js
-
-// Configuration loading
-const getConfig = async () => {
-    try {
-        const response = await fetch('/config');
-        if (response.ok) {
-            const config = await response.json();
-            console.log('📡 Loaded config:', config);
-            return config;
-        }
-    } catch (error) {
-        console.warn('⚠️  Could not fetch config, using defaults:', error);
-    }
-    
-    // Fallback configuration
-    const fallbackConfig = {
-        api_base_url: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-            ? 'http://127.0.0.1:8000/api/v1'
-            : '/api/v1',
-        app_name: 'EduQuiz Pro',
-        version: '1.0.0',
-        environment: 'development',
-        base_url: window.location.origin,
-        defaults: {
-            ai_provider: 'gemini',
-            grade_level: 'high school',
-            difficulty: 'medium',
-            num_questions: 10,
-            time_limit: 15
-        }
-    };
-    
-    console.log('🔧 Using fallback config:', fallbackConfig);
-    return fallbackConfig;
-};
-
-// Initialize app with dynamic configuration
-document.addEventListener('DOMContentLoaded', async () => {
-    console.log('🚀 Initializing EduQuiz Pro...');
-    
-    // Load configuration
-    const config = await getConfig();
-    const API_BASE_URL = config.api_base_url; // ✅ FIXED: Use config-based URL
-    
-    console.log(`🌐 API Base URL: ${API_BASE_URL}`);
-    console.log(`🏠 Environment: ${config.environment}`);
-    
+document.addEventListener('DOMContentLoaded', () => {
     const state = {
-        config,
         currentView: 'setup',
         settings: { 
-            totalQuestions: config.defaults.num_questions,
-            totalTime: config.defaults.time_limit,
-            gradeLevel: config.defaults.grade_level,
-            difficulty: config.defaults.difficulty,
+            totalQuestions: 10, 
+            totalTime: 15, 
+            gradeLevel: 'high school',
+            difficulty: 'medium', 
             apiKeys: { gemini: '', openai: '', groq: '' },
-            topics: { 
-                "Computer Science": ["Algorithms", "Data Structures", "Programming"], 
-                "General Knowledge": ["History", "Geography", "Science"],
-                "Mathematics": ["Algebra", "Geometry", "Calculus"],
-                "Science": ["Physics", "Chemistry", "Biology"]
-            }
+            topics: { "Computer Science": ["Algorithms", "Data Structures"], "General Knowledge": ["History"] }
         },
         quiz: { questions: [], currentQuestionIndex: 0, score: 0, timerId: null, timeRemaining: 0, startTime: null, userAnswers: [] },
         historyFilter: { mode: '', date: '' }
@@ -87,7 +35,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         },
     };
 
-    // ✅ REMOVED: Duplicate API_BASE_URL declaration that was overriding the config
+    const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? 'http://127.0.0.1:8000/api/v1'
+        : '/api/v1';
 
     const showToast = (message, isError = false) => {
         dom.toast.message.textContent = message;
@@ -227,9 +177,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     <i class="fas fa-robot mr-2"></i>AI Provider
                                 </label>
                                 <select id="ai-provider" class="w-full bg-gray-700 border border-gray-600 rounded-xl px-4 py-3 focus:ring-2 focus:ring-green-500 focus:outline-none text-lg">
-                                    <option value="gemini" ${config.defaults.ai_provider === 'gemini' ? 'selected' : ''}>Google Gemini</option>
-                                    <option value="openai" ${config.defaults.ai_provider === 'openai' ? 'selected' : ''}>OpenAI GPT</option>
-                                    <option value="groq" ${config.defaults.ai_provider === 'groq' ? 'selected' : ''}>Groq</option>
+                                    <option value="gemini">Google Gemini</option>
+                                    <option value="openai">OpenAI GPT</option>
+                                    <option value="groq">Groq</option>
                                 </select>
                             </div>
                             
@@ -294,15 +244,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             </div>`;
         addSetupEventListeners();
     }
-
-    // ✅ UPDATE: Add dynamic app title and footer
-    const updateAppInfo = () => {
-        document.title = config.app_name;
-        const footer = document.querySelector('footer p');
-        if (footer) {
-            footer.innerHTML = `&copy; 2025 ${config.app_name} v${config.version}. All rights reserved.`;
-        }
-    };
 
     function shuffleArray(array) {
         for (let i = array.length - 1; i > 0; i--) {
@@ -1400,7 +1341,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const init = () => {
         loadState();
-        updateAppInfo(); // ✅ NEW: Update app title and footer
         
         dom.navLinks.forEach((link, index) => {
             link.addEventListener('click', e => {
