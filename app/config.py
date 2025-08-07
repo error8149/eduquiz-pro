@@ -125,25 +125,32 @@ class Settings(BaseSettings):
     
     @validator("CORS_ORIGINS", pre=True)
     def parse_cors_origins(cls, v):
-        logging.info(f"Raw CORS_ORIGINS value: {v}")  # Debug log
-        # Handle missing, empty, or invalid CORS_ORIGINS
-        if v is None or str(v).strip() == "":
-            logging.warning("CORS_ORIGINS is empty or None, using default")
+        logging.info(f"Raw CORS_ORIGINS value (type: {type(v)}): {v}")  # Detailed debug log
+        try:
+            if v is None:
+                logging.warning("CORS_ORIGINS is None, using default")
+                return ["https://eduquiz-pro.up.railway.app"]
+            v_str = str(v).strip()
+            if not v_str:
+                logging.warning("CORS_ORIGINS is empty, using default")
+                return ["https://eduquiz-pro.up.railway.app"]
+            if isinstance(v, str):
+                cleaned = [origin.strip() for origin in v_str.split(",") if origin.strip()]
+                if not cleaned:
+                    logging.warning("CORS_ORIGINS string is invalid, using default")
+                    return ["https://eduquiz-pro.up.railway.app"]
+                return cleaned
+            if isinstance(v, list):
+                cleaned = [origin for origin in v if isinstance(origin, str) and origin.strip()]
+                if not cleaned:
+                    logging.warning("CORS_ORIGINS list is invalid, using default")
+                    return ["https://eduquiz-pro.up.railway.app"]
+                return cleaned
+            logging.error(f"Unexpected CORS_ORIGINS type: {type(v)}, using default")
             return ["https://eduquiz-pro.up.railway.app"]
-        if isinstance(v, str):
-            cleaned = [origin.strip() for origin in v.split(",") if origin.strip()]
-            if not cleaned:
-                logging.warning("CORS_ORIGINS string is invalid, using default")
-                return ["https://eduquiz-pro.up.railway.app"]
-            return cleaned
-        if isinstance(v, list):
-            cleaned = [origin for origin in v if isinstance(origin, str) and origin.strip()]
-            if not cleaned:
-                logging.warning("CORS_ORIGINS list is invalid, using default")
-                return ["https://eduquiz-pro.up.railway.app"]
-            return cleaned
-        logging.error(f"Unexpected CORS_ORIGINS type: {type(v)}, using default")
-        return ["https://eduquiz-pro.up.railway.app"]
+        except Exception as e:
+            logging.error(f"Error parsing CORS_ORIGINS: {e}, using default")
+            return ["https://eduquiz-pro.up.railway.app"]
     
     @property
     def is_development(self) -> bool:

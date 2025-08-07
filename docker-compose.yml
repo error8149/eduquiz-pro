@@ -1,0 +1,27 @@
+version: "3.8"
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - HOST=0.0.0.0
+      - DATABASE_URL=sqlite:///./quizapp.db  # Update for your local DB
+      - CORS_ORIGINS=https://eduquiz-pro.up.railway.app
+      - LOG_LEVEL=INFO
+      - ENABLE_FILE_LOGGING=true
+      - ENABLE_CONSOLE_LOGGING=true
+      - ENABLE_HISTORY=true
+      - ENABLE_EXPORT=true
+      - ENABLE_AI_EXPLANATIONS=true
+      - ENABLE_MANUAL_MODE=true
+      - MAX_QUESTIONS_PER_QUIZ=50
+      - MIN_QUESTIONS_PER_QUIZ=1
+      - AI_REQUEST_TIMEOUT=30
+      - GEMINI_API_KEY=<your-gemini-api-key>
+      - OPENAI_API_KEY=<your-openai-api-key>
+      - GROQ_API_KEY=<your-groq-api-key>
+    volumes:
+      - .:/app
